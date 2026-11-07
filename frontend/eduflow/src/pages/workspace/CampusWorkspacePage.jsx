@@ -1,0 +1,223 @@
+import React, { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import {
+  School as SchoolIcon,
+  Users,
+  ShieldCheck,
+  UserPlus,
+  ArrowRight,
+  RefreshCw,
+  Building2
+} from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
+import {
+  fetchSchoolWorkspace,
+  assignInitialAdmin,
+  inviteStaffMember
+} from '../../services/api'
+import { RoleSwitcher } from '../../components/workspace/RoleSwitcher'
+import { InitialAdminWizard } from '../../components/workspace/InitialAdminWizard'
+import { InviteStaffModal } from '../../components/workspace/InviteStaffModal'
+import { FacultyRosterTable } from '../../components/workspace/FacultyRosterTable'
+import { Alert } from '../../components/common/Alert'
+
+export function CampusWorkspacePage() {
+  const { currentUser, activeRole, setActiveRole, isAuthenticated, loadUserData } = useAuth()
+  const navigate = useNavigate()
+
+  const [workspace, setWorkspace] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [notice, setNotice] = useState(null)
+  const [inviteModalOpen, setInviteModalOpen] = useState(false)
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [devInvitationToken, setDevInvitationToken] = useState(null)
+
+  const schoolId = currentUser?.memberships?.school_id
+
+  const loadWorkspace = async (role) => {
+    if (!schoolId) return
+    setLoading(true)
+    const res = await fetchSchoolWorkspace(schoolId, role || activeRole)
+    if (res.ok && res.data?.success) {
+      setWorkspace(res.data.data)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    if (isAuthenticated && schoolId) {
+      loadWorkspace(activeRole)
+    }
+  }, [isAuthenticated, schoolId, activeRole])
+
+  const handleSelectRole = (role) => {
+    setActiveRole(role)
+    loadWorkspace(role)
+  }
+
+  const handleAssignAdmin = async (adminEmail) => {
+    if (!schoolId) return
+    setLoading(true)
+    const res = await assignInitialAdmin(schoolId, { admin_email: adminEmail })
+    setLoading(false)
+
+    if (res.ok && res.data?.success) {
+      setNotice({
+        type: 'success',
+        message: 'First Administrator assigned! Campus status is now ACTIVE.'
+      })
+      await loadUserData()
+      loadWorkspace(activeRole)
+    } else {
+      setNotice({
+        type: 'error',
+        message: res.data?.error?.message || 'Failed to assign administrator.'
+      })
+    }
+  }
+
+  const handleInviteStaff = async (email, role) => {
+    if (!schoolId) return
+    setInviteLoading(true)
+    const res = await inviteStaffMember(schoolId, email, role, activeRole)
+    setInviteLoading(false)
+
+    if (res.ok && res.data?.success) {
+      setNotice({
+        type: 'success',
+        message: `Invitation successfully sent to ${email} as ${role}!`
+      })
+      if (res.data.data?.dev_invitation_token) {
+        setDevInvitationToken(res.data.data.dev_invitation_token)
+      }
+      setInviteModalOpen(false)
+      loadWorkspace(activeRole)
+    } else {
+      setNotice({
+        type: 'error',
+        message: res.data?.error?.message || 'Failed to invite staff member.'
+      })
+    }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-slate-50">
+        <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center space-y-4">
+          <Building2 className="w-10 h-10 text-slate-400 mx-auto" />
+          <h2 className="text-xl font-bold text-[#0F172A]">Workspace Sign In Required</h2>
+          <p className="text-xs text-slate-500">Please sign in to access your school campus workspace.</p>
+          <Link
+            to="/"
+            className="inline-block px-4 py-2 rounded-lg bg-[#3B82F6] hover:bg-blue-600 text-white font-bold text-xs"
+          >
+            Return to Homepage
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!schoolId) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 bg-slate-50">
+        <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center space-y-4">
+          <SchoolIcon className="w-10 h-10 text-amber-500 mx-auto" />
+          <h2 className="text-xl font-bold text-[#0F172A]">No Active Campus Workspace</h2>
+          <p className="text-xs text-slate-500">
+            You do not currently belong to an active school workspace. Please apply to register your school first.
+          </p>
+          <Link
+            to="/school-register"
+            className="inline-block px-4 py-2 rounded-lg bg-[#3B82F6] hover:bg-blue-600 text-white font-bold text-xs"
+          >
+            Register School
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const assignedRoles = currentUser?.memberships?.assigned_roles || []
+  const isAdminOrProprietor = activeRole === 'PROPRIETOR' || activeRole === 'ADMINISTRATOR'
+
+  return (
+    <div className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-8">
+      {/* Workspace Header */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center space-x-4">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#3B82F6]">
+            <SchoolIcon className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-black text-[#0F172A]">{workspace?.school?.name || 'School Workspace'}</h1>
+              <span
+                className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                  workspace?.school?.workspace_status === 'ACTIVE'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-blue-100 text-blue-800'
+                }`}
+              >
+                {workspace?.school?.workspace_status || 'ONBOARDING'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Campus Tenant ID: <span className="font-mono text-slate-700">{schoolId}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <RoleSwitcher
+            assignedRoles={assignedRoles}
+            activeRole={activeRole}
+            onSelectRole={handleSelectRole}
+          />
+
+          {isAdminOrProprietor && (
+            <button
+              onClick={() => setInviteModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-[#3B82F6] hover:bg-blue-600 text-white font-bold text-xs shadow-xs flex items-center gap-1.5"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Invite Staff</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {notice && (
+        <Alert
+          type={notice.type}
+          message={notice.message}
+          onClose={() => setNotice(null)}
+        />
+      )}
+
+      {devInvitationToken && (
+        <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+          <span className="font-bold">Staff Invitation Enqueued in Outbox:</span>
+          <p className="font-mono mt-1 break-all">{devInvitationToken}</p>
+        </div>
+      )}
+
+      {/* Onboarding Wizard (if status is ONBOARDING and user is Proprietor) */}
+      {workspace?.school?.workspace_status === 'ONBOARDING' && activeRole === 'PROPRIETOR' && (
+        <InitialAdminWizard onAssignAdmin={handleAssignAdmin} loading={loading} />
+      )}
+
+      {/* Faculty Roster */}
+      <FacultyRosterTable members={workspace?.members} />
+
+      {/* Invite Staff Modal */}
+      <InviteStaffModal
+        isOpen={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        onInvite={handleInviteStaff}
+        loading={inviteLoading}
+      />
+    </div>
+  )
+}
+

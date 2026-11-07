@@ -46,8 +46,8 @@ describe('Eduflow App UI', () => {
 
     render(<App />)
 
-    const operatorPortalBtn = screen.getByRole('button', { name: /Platform Operator Portal/i })
-    fireEvent.click(operatorPortalBtn)
+    const operatorPortalLink = screen.getByRole('link', { name: /Platform Operator Portal/i })
+    fireEvent.click(operatorPortalLink)
 
     expect(screen.getByText(/Platform Administrator Portal/i)).toBeInTheDocument()
     expect(screen.getByText(/Authenticate Operator/i)).toBeInTheDocument()
@@ -55,8 +55,8 @@ describe('Eduflow App UI', () => {
     expect(window.location.pathname).toBe('/admin')
 
     // Click Back to Public Website
-    const backBtn = screen.getByRole('button', { name: /Back to Eduflow Public Website/i })
-    fireEvent.click(backBtn)
+    const backLink = screen.getByRole('link', { name: /Back to Eduflow Public Website/i })
+    fireEvent.click(backLink)
     expect(window.location.pathname).toBe('/')
     expect(screen.getByText(/The Operating System for Modern/i)).toBeInTheDocument()
   })

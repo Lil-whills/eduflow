@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'audit',
     'authentication',
     'tenants',
+    'school_config',
 ]
 
 MIDDLEWARE = [

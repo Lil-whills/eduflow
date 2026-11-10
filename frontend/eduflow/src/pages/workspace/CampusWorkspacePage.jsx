@@ -7,7 +7,11 @@ import {
   UserPlus,
   ArrowRight,
   RefreshCw,
-  Building2
+  Building2,
+  Calendar,
+  Layers,
+  BookOpen,
+  GraduationCap
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -18,13 +22,19 @@ import {
 import { RoleSwitcher } from '../../components/workspace/RoleSwitcher'
 import { InitialAdminWizard } from '../../components/workspace/InitialAdminWizard'
 import { InviteStaffModal } from '../../components/workspace/InviteStaffModal'
-import { FacultyRosterTable } from '../../components/workspace/FacultyRosterTable'
 import { Alert } from '../../components/common/Alert'
+import { ProfileSection } from '../../components/workspace/ProfileSection'
+import { AcademicCalendarSection } from '../../components/workspace/AcademicCalendarSection'
+import { ClassesStreamsSection } from '../../components/workspace/ClassesStreamsSection'
+import { SubjectCatalogueSection } from '../../components/workspace/SubjectCatalogueSection'
+import { StaffGovernanceSection } from '../../components/workspace/StaffGovernanceSection'
+import { TeachingAssignmentsSection } from '../../components/workspace/TeachingAssignmentsSection'
 
 export function CampusWorkspacePage() {
   const { currentUser, activeRole, setActiveRole, isAuthenticated, loadUserData } = useAuth()
   const navigate = useNavigate()
 
+  const [activeTab, setActiveTab] = useState('profile') // 'profile' | 'calendar' | 'classes' | 'subjects' | 'staff' | 'teaching'
   const [workspace, setWorkspace] = useState(null)
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState(null)
@@ -140,9 +150,19 @@ export function CampusWorkspacePage() {
 
   const assignedRoles = currentUser?.memberships?.assigned_roles || []
   const isAdminOrProprietor = activeRole === 'PROPRIETOR' || activeRole === 'ADMINISTRATOR'
+  const isProprietor = activeRole === 'PROPRIETOR'
+
+  const navTabs = [
+    { id: 'profile', label: 'School Profile', icon: Building2 },
+    { id: 'calendar', label: 'Academic Calendar', icon: Calendar },
+    { id: 'classes', label: 'Classes & Streams', icon: Layers },
+    { id: 'subjects', label: 'Subject Catalogue', icon: BookOpen },
+    { id: 'staff', label: 'Staff Governance', icon: Users },
+    { id: 'teaching', label: 'Teaching Assignments', icon: GraduationCap },
+  ]
 
   return (
-    <div className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-8">
+    <div className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Workspace Header */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center space-x-4">
@@ -207,8 +227,60 @@ export function CampusWorkspacePage() {
         <InitialAdminWizard onAssignAdmin={handleAssignAdmin} loading={loading} />
       )}
 
-      {/* Faculty Roster */}
-      <FacultyRosterTable members={workspace?.members} />
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-slate-200 overflow-x-auto space-x-2">
+        {navTabs.map((tab) => {
+          const Icon = tab.icon
+          const isActive = activeTab === tab.id
+
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
+                isActive
+                  ? 'border-[#3B82F6] text-[#3B82F6] bg-blue-50/40'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Active Tab Panel */}
+      <div>
+        {activeTab === 'profile' && (
+          <ProfileSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+        )}
+
+        {activeTab === 'calendar' && (
+          <AcademicCalendarSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+        )}
+
+        {activeTab === 'classes' && (
+          <ClassesStreamsSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+        )}
+
+        {activeTab === 'subjects' && (
+          <SubjectCatalogueSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+        )}
+
+        {activeTab === 'staff' && (
+          <StaffGovernanceSection
+            schoolId={schoolId}
+            activeRole={activeRole}
+            canEdit={isAdminOrProprietor}
+            isProprietor={isProprietor}
+          />
+        )}
+
+        {activeTab === 'teaching' && (
+          <TeachingAssignmentsSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+        )}
+      </div>
 
       {/* Invite Staff Modal */}
       <InviteStaffModal
@@ -220,4 +292,3 @@ export function CampusWorkspacePage() {
     </div>
   )
 }
-

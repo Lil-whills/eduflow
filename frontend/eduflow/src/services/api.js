@@ -368,6 +368,202 @@ export async function inviteStaffMember(schoolId, email, roleName, activeRole) {
   });
 }
 
+// ----------------------------------------------------------------------
+// Feature 2: School Configuration & Staff Management API Methods
+// ----------------------------------------------------------------------
+
+export async function fetchSchoolProfile(schoolId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/profile/`, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function updateSchoolProfile(schoolId, profileData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/profile/`, {
+    method: 'PATCH',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(profileData),
+  });
+}
+
+export async function fetchAcademicYears(schoolId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/academic-years/`, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function createAcademicYear(schoolId, yearData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/academic-years/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(yearData),
+  });
+}
+
+export async function activateAcademicYear(schoolId, yearId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/academic-years/${yearId}/activate/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function completeAcademicYear(schoolId, yearId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/academic-years/${yearId}/complete/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function createAcademicTerm(schoolId, yearId, termData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/academic-years/${yearId}/terms/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(termData),
+  });
+}
+
+export async function fetchClassLevels(schoolId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-levels/`, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function createClassLevel(schoolId, levelData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-levels/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(levelData),
+  });
+}
+
+export async function fetchClassGroups(schoolId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-groups/`, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function createClassGroup(schoolId, groupData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-groups/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(groupData),
+  });
+}
+
+export async function fetchSubjects(schoolId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/subjects/`, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function createSubject(schoolId, subjectData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/subjects/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(subjectData),
+  });
+}
+
+export async function fetchClassSubjects(schoolId, filters = {}, activeRole) {
+  const query = new URLSearchParams(filters).toString();
+  const endpoint = query ? `/schools/${schoolId}/class-subjects/?${query}` : `/schools/${schoolId}/class-subjects/`;
+  return await apiFetch(endpoint, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function createClassSubject(schoolId, mappingData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-subjects/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(mappingData),
+  });
+}
+
+export async function deleteClassSubject(schoolId, mappingId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-subjects/${mappingId}/`, {
+    method: 'DELETE',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function fetchSchoolStaff(schoolId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/staff/`, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function dismissStaffMember(schoolId, membershipId, reason = '', activeRole) {
+  return await apiFetch(`/schools/${schoolId}/staff/${membershipId}/dismiss/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function reassignAdministrator(schoolId, newAdminEmail, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/governance/reassign-admin/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify({ new_admin_email: newAdminEmail }),
+  });
+}
+
+export async function fetchClassTeacherAssignments(schoolId, filters = {}, activeRole) {
+  const query = new URLSearchParams(filters).toString();
+  const endpoint = query ? `/schools/${schoolId}/teaching-assignments/class-teachers/?${query}` : `/schools/${schoolId}/teaching-assignments/class-teachers/`;
+  return await apiFetch(endpoint, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function assignClassTeacher(schoolId, assignmentData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/teaching-assignments/class-teachers/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(assignmentData),
+  });
+}
+
+export async function endClassTeacherAssignment(schoolId, assignmentId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/teaching-assignments/class-teachers/${assignmentId}/end/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function fetchSubjectTeacherAssignments(schoolId, filters = {}, activeRole) {
+  const query = new URLSearchParams(filters).toString();
+  const endpoint = query ? `/schools/${schoolId}/teaching-assignments/subject-teachers/?${query}` : `/schools/${schoolId}/teaching-assignments/subject-teachers/`;
+  return await apiFetch(endpoint, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function assignSubjectTeacher(schoolId, assignmentData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/teaching-assignments/subject-teachers/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(assignmentData),
+  });
+}
+
+export async function endSubjectTeacherAssignment(schoolId, assignmentId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/teaching-assignments/subject-teachers/${assignmentId}/end/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
 export default {
   setAccessToken,
   getAccessToken,
@@ -400,4 +596,29 @@ export default {
   assignMemberRole,
   removeMemberRole,
   inviteStaffMember,
+  fetchSchoolProfile,
+  updateSchoolProfile,
+  fetchAcademicYears,
+  createAcademicYear,
+  activateAcademicYear,
+  completeAcademicYear,
+  createAcademicTerm,
+  fetchClassLevels,
+  createClassLevel,
+  fetchClassGroups,
+  createClassGroup,
+  fetchSubjects,
+  createSubject,
+  fetchClassSubjects,
+  createClassSubject,
+  deleteClassSubject,
+  fetchSchoolStaff,
+  dismissStaffMember,
+  reassignAdministrator,
+  fetchClassTeacherAssignments,
+  assignClassTeacher,
+  endClassTeacherAssignment,
+  fetchSubjectTeacherAssignments,
+  assignSubjectTeacher,
+  endSubjectTeacherAssignment,
 };

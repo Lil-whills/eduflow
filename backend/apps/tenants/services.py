@@ -283,7 +283,7 @@ class ProvisioningService:
                     defaults={'is_active': True}
                 )
 
-                # 5. Cryptographic Invitation Token
+                # 6. Cryptographic Invitation Token
                 raw_invitation_token = secrets.token_urlsafe(32)
                 token_hash = hashlib.sha256(raw_invitation_token.encode('utf-8')).hexdigest()
                 expires_at = timezone.now() + timedelta(days=7)
@@ -296,7 +296,19 @@ class ProvisioningService:
                     expires_at=expires_at
                 )
 
-                # 6. Stage AES-256-GCM Encrypted Outbox Notification
+                # 6b. Bootstrap standard Ghana curriculum and baseline school structure
+                from school_config.services import SchoolConfigBootstrapService
+                SchoolConfigBootstrapService.bootstrap_school_structure(
+                    school=created_school,
+                    level_type='BASIC_COMPLETE',
+                    profile_data={
+                        'display_name': access_req.school_name,
+                        'contact_email': email,
+                        'contact_phone': access_req.contact_phone or '',
+                    }
+                )
+
+                # 7. Stage AES-256-GCM Encrypted Outbox Notification
                 payload = {
                     'token': raw_invitation_token,
                     'school_name': created_school.name,

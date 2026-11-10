@@ -46,7 +46,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     # Eduflow Domain Apps
-    'core',
+    'core',    
     'audit',
     'authentication',
     'tenants',

@@ -38,6 +38,7 @@ class SchoolProfileSerializer(serializers.ModelSerializer):
             'contact_phone',
             'website',
             'registration_number',
+            'default_class_capacity',
             'created_at',
             'updated_at'
         ]
@@ -82,6 +83,14 @@ class ClassGroupSerializer(serializers.ModelSerializer):
     class_level_name = serializers.CharField(source='class_level.name', read_only=True)
     stage = serializers.CharField(source='class_level.stage', read_only=True)
     display_name = serializers.CharField(read_only=True)
+    capacity = serializers.SerializerMethodField()
+
+    def get_capacity(self, obj):
+        if obj.capacity is not None:
+            return obj.capacity
+        if hasattr(obj.school, 'profile') and obj.school.profile.default_class_capacity:
+            return obj.school.profile.default_class_capacity
+        return 35
 
     class Meta:
         model = ClassGroup
@@ -93,6 +102,7 @@ class ClassGroupSerializer(serializers.ModelSerializer):
             'stage',
             'stream_name',
             'display_name',
+            'capacity',
             'status',
             'created_at'
         ]

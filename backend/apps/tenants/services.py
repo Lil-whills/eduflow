@@ -446,6 +446,7 @@ class SchoolRoleService:
                 raise PermissionDenied("Only an active Proprietor can complete school onboarding.")
 
             admin_role = Role.objects.get(name=Role.ADMINISTRATOR)
+            raw_token = None
 
             if email == proprietor_user.email.lower():
                 # Proprietor assigns self as Administrator
@@ -518,7 +519,7 @@ class SchoolRoleService:
                 metadata={'admin_email': email, 'workspace_status': 'ACTIVE'}
             )
 
-        return school, admin_user
+        return school, admin_user, raw_token
 
     @classmethod
     def assign_role(cls, school_id, target_user_id, role_name: str, actor_user, request=None):
@@ -693,9 +694,14 @@ class SchoolRoleService:
             if not actor_has_perm and not actor_user.is_superuser:
                 raise PermissionDenied("You do not have permission to invite staff to this school.")
 
-            role = Role.objects.filter(name=role_name).first()
-            if not role:
-                raise ValidationError(f"Role '{role_name}' does not exist.")
+            # All staff members foundational role is SUBJECT_TEACHER
+            subj_teacher_role, _ = Role.objects.get_or_create(name=Role.SUBJECT_TEACHER)
+
+            role = None
+            if role_name:
+                role = Role.objects.filter(name=role_name).first()
+                if not role:
+                    raise ValidationError(f"Role '{role_name}' does not exist.")
 
             target_user, _ = User.objects.get_or_create(
                 email=normalized_email,
@@ -708,11 +714,20 @@ class SchoolRoleService:
                 defaults={'status': 'ACTIVE'}
             )
 
+            # Assign foundational SUBJECT_TEACHER to all staff members
             RoleAssignment.objects.update_or_create(
                 membership=membership,
-                role=role,
+                role=subj_teacher_role,
                 defaults={'is_active': True}
             )
+
+            # If an additional role was specified and is different, assign it as well
+            if role and role.name != Role.SUBJECT_TEACHER:
+                RoleAssignment.objects.update_or_create(
+                    membership=membership,
+                    role=role,
+                    defaults={'is_active': True}
+                )
 
             raw_token = secrets.token_urlsafe(32)
             token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()

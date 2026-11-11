@@ -5,7 +5,8 @@ import { useAuth } from '../../context/AuthContext'
 import {
   submitSchoolRequest,
   verifySchoolRequest,
-  fetchMySchoolRequests
+  fetchMySchoolRequests,
+  formatApiError
 } from '../../services/api'
 import { Alert } from '../../components/common/Alert'
 
@@ -46,11 +47,19 @@ export function SchoolRegisterPage() {
     e.preventDefault()
     setError(null)
     setMessage(null)
+
+    // Pre-validation for Ghanaian telephone format
+    const cleanPhone = phone.trim().replace(/\s+/g, '')
+    if (cleanPhone.length < 10) {
+      setError('Please enter a valid Ghanaian telephone number with at least 10 digits (e.g. 0241234567 or +233241234567).')
+      return
+    }
+
     setLoading(true)
 
     const res = await submitSchoolRequest({
-      school_name: schoolName,
-      contact_phone: phone
+      school_name: schoolName.trim(),
+      contact_phone: cleanPhone
     })
     setLoading(false)
 
@@ -64,7 +73,7 @@ export function SchoolRegisterPage() {
       setPhone('')
       loadRequests()
     } else {
-      setError(res.data?.error?.message || 'Submission failed.')
+      setError(formatApiError(res, 'Submission failed. Please check your inputs.'))
     }
   }
 
@@ -86,7 +95,7 @@ export function SchoolRegisterPage() {
     } else {
       setVerifyStatus({
         ok: false,
-        msg: res.data?.error?.message || 'Verification failed.'
+        msg: formatApiError(res, 'Verification token invalid or expired.')
       })
     }
   }

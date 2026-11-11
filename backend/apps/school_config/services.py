@@ -334,10 +334,11 @@ class StaffGovernanceService:
 
     @classmethod
     @transaction.atomic
-    def reassign_administrator(cls, school: School, new_admin_email: str, actor) -> SchoolMembership:
+    def reassign_administrator(cls, school: School, new_admin_email: str, actor):
         """
         Sovereign Proprietor operation: appoints or invites a new Administrator,
-        revoking the Administrator role from any previous Administrator.
+        revoking the Administrator role and invalidating sessions from any previous Administrator.
+        All academic years, terms, classes, streams, and subjects remain 100% intact.
         """
         actor_is_prop = RoleAssignment.objects.filter(
             membership__school=school,
@@ -359,10 +360,20 @@ class StaffGovernanceService:
             is_active=True
         ).update(is_active=False)
 
+        # Invalidate active login sessions of previous administrators
+        from authentication.models import User
+        prev_admins = User.objects.filter(
+            memberships__school=school,
+            memberships__role_assignments__role=admin_role
+        ).exclude(email=clean_email).distinct()
+        for prev_admin in prev_admins:
+            prev_admin.token_version += 1
+            prev_admin.save(update_fields=['token_version'])
+
         # Find or create membership for new admin
         membership = SchoolMembership.objects.filter(school=school, user__email=clean_email).first()
+        raw_token = None
         if not membership:
-            from authentication.models import User
             user = User.objects.filter(email=clean_email).first()
             if not user:
                 user = User.objects.create_user(email=clean_email, password=None, is_active=False)
@@ -373,6 +384,41 @@ class StaffGovernanceService:
         ra, _ = RoleAssignment.objects.get_or_create(membership=membership, role=admin_role)
         ra.is_active = True
         ra.save()
+
+        # If user is not active, generate invitation token & outbox email so they can activate via email link or registration
+        if not membership.user.is_active:
+            import secrets, hashlib
+            from datetime import timedelta
+            from django.utils import timezone
+            from tenants.models import InvitationToken, OutboxEmail
+            from tenants.services import encrypt_payload
+
+            raw_token = secrets.token_urlsafe(32)
+            token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+            expires_at = timezone.now() + timedelta(days=7)
+
+            InvitationToken.objects.filter(school=school, email=clean_email, is_accepted=False).update(is_superseded=True)
+            InvitationToken.objects.create(
+                school=school,
+                email=clean_email,
+                token_hash=token_hash,
+                is_accepted=False,
+                expires_at=expires_at
+            )
+            payload = {
+                'token': raw_token,
+                'school_name': school.name,
+                'recipient_email': clean_email,
+                'role': Role.ADMINISTRATOR,
+                'invitation_url': f"/accept-invitation?token={raw_token}",
+                'expires_at': expires_at.isoformat()
+            }
+            OutboxEmail.objects.create(
+                recipient=clean_email,
+                email_type='ADMIN_INVITATION',
+                encrypted_payload=encrypt_payload(payload),
+                status='PENDING'
+            )
 
         # If school was in ONBOARDING status, transition to ACTIVE
         if school.workspace_status == 'ONBOARDING':
@@ -389,7 +435,7 @@ class StaffGovernanceService:
             }
         )
 
-        return membership
+        return membership, raw_token
 
 
 class TeachingAssignmentService:
@@ -403,8 +449,13 @@ class TeachingAssignmentService:
         if teacher_membership.school_id != school.id or teacher_membership.status != 'ACTIVE':
             raise ValidationError("Teacher must be an active member of this school.")
 
-        if not RoleAssignment.objects.filter(membership=teacher_membership, role__name=Role.CLASS_TEACHER, is_active=True).exists():
-            raise ValidationError("Staff member does not hold the active Class Teacher role.")
+        # Ensure teacher holds CLASS_TEACHER role
+        class_teacher_role, _ = Role.objects.get_or_create(name=Role.CLASS_TEACHER)
+        RoleAssignment.objects.get_or_create(
+            membership=teacher_membership,
+            role=class_teacher_role,
+            defaults={'is_active': True}
+        )
 
         if class_group.school_id != school.id or academic_year.school_id != school.id:
             raise ValidationError("Class group and academic year must belong to this school.")
@@ -446,8 +497,13 @@ class TeachingAssignmentService:
         if teacher_membership.school_id != school.id or teacher_membership.status != 'ACTIVE':
             raise ValidationError("Teacher must be an active member of this school.")
 
-        if not RoleAssignment.objects.filter(membership=teacher_membership, role__name=Role.SUBJECT_TEACHER, is_active=True).exists():
-            raise ValidationError("Staff member does not hold the active Subject Teacher role.")
+        # Ensure teacher holds SUBJECT_TEACHER role
+        subj_teacher_role, _ = Role.objects.get_or_create(name=Role.SUBJECT_TEACHER)
+        RoleAssignment.objects.get_or_create(
+            membership=teacher_membership,
+            role=subj_teacher_role,
+            defaults={'is_active': True}
+        )
 
         if class_group.school_id != school.id or subject.school_id != school.id or academic_year.school_id != school.id:
             raise ValidationError("Class, subject, and academic year must belong to this school.")

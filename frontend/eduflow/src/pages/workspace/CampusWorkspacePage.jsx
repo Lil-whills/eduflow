@@ -17,7 +17,8 @@ import { useAuth } from '../../context/AuthContext'
 import {
   fetchSchoolWorkspace,
   assignInitialAdmin,
-  inviteStaffMember
+  inviteStaffMember,
+  formatApiError
 } from '../../services/api'
 import { RoleSwitcher } from '../../components/workspace/RoleSwitcher'
 import { InitialAdminWizard } from '../../components/workspace/InitialAdminWizard'
@@ -29,6 +30,7 @@ import { ClassesStreamsSection } from '../../components/workspace/ClassesStreams
 import { SubjectCatalogueSection } from '../../components/workspace/SubjectCatalogueSection'
 import { StaffGovernanceSection } from '../../components/workspace/StaffGovernanceSection'
 import { TeachingAssignmentsSection } from '../../components/workspace/TeachingAssignmentsSection'
+import { StudentsSection } from '../../components/workspace/StudentsSection'
 
 export function CampusWorkspacePage() {
   const { currentUser, activeRole, setActiveRole, isAuthenticated, loadUserData } = useAuth()
@@ -43,6 +45,73 @@ export function CampusWorkspacePage() {
   const [devInvitationToken, setDevInvitationToken] = useState(null)
 
   const schoolId = currentUser?.memberships?.school_id
+
+  const assignedRoles = currentUser?.memberships?.assigned_roles || []
+  const isProprietor = activeRole === 'PROPRIETOR'
+  const isAdmin = activeRole === 'ADMINISTRATOR'
+  const isClassTeacher = activeRole === 'CLASS_TEACHER'
+  const isSubjectTeacher = activeRole === 'SUBJECT_TEACHER'
+  const isAccountant = activeRole === 'ACCOUNTANT'
+
+  const canEditOperational = isAdmin || (isProprietor && assignedRoles.includes('ADMINISTRATOR'))
+  const canEditProfile = isProprietor || isAdmin
+
+  // Role-segregated navigation portals
+  let navTabs = []
+  if (isAdmin) {
+    navTabs = [
+      { id: 'students', label: 'Students & Enrollment', icon: Users },
+      { id: 'calendar', label: 'Academic Calendar', icon: Calendar },
+      { id: 'classes', label: 'Classes & Streams', icon: Layers },
+      { id: 'subjects', label: 'Subject Catalogue', icon: BookOpen },
+      { id: 'staff', label: 'Staff Roster & Roles', icon: Users },
+      { id: 'teaching', label: 'Teaching Assignments', icon: GraduationCap },
+      { id: 'profile', label: 'School Profile', icon: Building2 },
+    ]
+  } else if (isProprietor) {
+    navTabs = [
+      { id: 'profile', label: 'School Profile', icon: Building2 },
+      { id: 'staff', label: 'Staff & Governance', icon: Users },
+      { id: 'students', label: 'Students & Enrollment', icon: Users },
+      { id: 'calendar', label: 'Academic Calendar', icon: Calendar },
+      { id: 'classes', label: 'Classes & Streams', icon: Layers },
+      { id: 'subjects', label: 'Subject Catalogue', icon: BookOpen },
+      { id: 'teaching', label: 'Teaching Assignments', icon: GraduationCap },
+    ]
+  } else if (isClassTeacher) {
+    navTabs = [
+      { id: 'students', label: 'My Class Students & Roster', icon: Users },
+      { id: 'teaching', label: 'My Teaching Assignments', icon: GraduationCap },
+      { id: 'subjects', label: 'Subject Catalogue', icon: BookOpen },
+    ]
+  } else if (isSubjectTeacher) {
+    navTabs = [
+      { id: 'students', label: 'My Subject Students', icon: Users },
+      { id: 'teaching', label: 'My Teaching Assignments', icon: GraduationCap },
+      { id: 'subjects', label: 'Subject Catalogue', icon: BookOpen },
+    ]
+  } else if (isAccountant) {
+    navTabs = [
+      { id: 'students', label: 'Students & Billing Directory', icon: Users },
+      { id: 'finance', label: 'Fees & Accounts', icon: Building2 },
+    ]
+  } else {
+    navTabs = [
+      { id: 'students', label: 'Students', icon: Users },
+      { id: 'teaching', label: 'Teaching Assignments', icon: GraduationCap },
+    ]
+  }
+
+  // Set appropriate home view when operational role context changes
+  useEffect(() => {
+    if (activeRole === 'PROPRIETOR') {
+      setActiveTab('profile')
+    } else if (activeRole === 'ADMINISTRATOR') {
+      setActiveTab('students')
+    } else if (activeRole === 'CLASS_TEACHER' || activeRole === 'SUBJECT_TEACHER' || activeRole === 'ACCOUNTANT') {
+      setActiveTab('students')
+    }
+  }, [activeRole])
 
   const loadWorkspace = async (role) => {
     if (!schoolId) return
@@ -72,16 +141,22 @@ export function CampusWorkspacePage() {
     setLoading(false)
 
     if (res.ok && res.data?.success) {
+      const inviteUrl = res.data?.data?.invitation_url
       setNotice({
         type: 'success',
-        message: 'First Administrator assigned! Campus status is now ACTIVE.'
+        message: inviteUrl
+          ? `First Administrator assigned to ${adminEmail}! They can activate via the invitation link or simply click "Create Account" with this email address to establish their password and access the campus.`
+          : 'First Administrator assigned! Campus status is now ACTIVE.'
       })
+      if (res.data?.data?.dev_invitation_token) {
+        setDevInvitationToken(res.data.data.dev_invitation_token)
+      }
       await loadUserData()
       loadWorkspace(activeRole)
     } else {
       setNotice({
         type: 'error',
-        message: res.data?.error?.message || 'Failed to assign administrator.'
+        message: formatApiError(res, 'Failed to assign administrator.')
       })
     }
   }
@@ -95,7 +170,7 @@ export function CampusWorkspacePage() {
     if (res.ok && res.data?.success) {
       setNotice({
         type: 'success',
-        message: `Invitation successfully sent to ${email} as ${role}!`
+        message: `Invitation successfully sent to ${email}! Faculty member invited with foundational Subject Teacher role.`
       })
       if (res.data.data?.dev_invitation_token) {
         setDevInvitationToken(res.data.data.dev_invitation_token)
@@ -105,7 +180,7 @@ export function CampusWorkspacePage() {
     } else {
       setNotice({
         type: 'error',
-        message: res.data?.error?.message || 'Failed to invite staff member.'
+        message: formatApiError(res, 'Failed to invite staff member.')
       })
     }
   }
@@ -148,19 +223,6 @@ export function CampusWorkspacePage() {
     )
   }
 
-  const assignedRoles = currentUser?.memberships?.assigned_roles || []
-  const isAdminOrProprietor = activeRole === 'PROPRIETOR' || activeRole === 'ADMINISTRATOR'
-  const isProprietor = activeRole === 'PROPRIETOR'
-
-  const navTabs = [
-    { id: 'profile', label: 'School Profile', icon: Building2 },
-    { id: 'calendar', label: 'Academic Calendar', icon: Calendar },
-    { id: 'classes', label: 'Classes & Streams', icon: Layers },
-    { id: 'subjects', label: 'Subject Catalogue', icon: BookOpen },
-    { id: 'staff', label: 'Staff Governance', icon: Users },
-    { id: 'teaching', label: 'Teaching Assignments', icon: GraduationCap },
-  ]
-
   return (
     <div className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Workspace Header */}
@@ -195,7 +257,7 @@ export function CampusWorkspacePage() {
             onSelectRole={handleSelectRole}
           />
 
-          {isAdminOrProprietor && (
+          {canEditOperational && (
             <button
               onClick={() => setInviteModalOpen(true)}
               className="px-3.5 py-1.5 rounded-lg bg-[#3B82F6] hover:bg-blue-600 text-white font-bold text-xs shadow-xs flex items-center gap-1.5"
@@ -252,33 +314,58 @@ export function CampusWorkspacePage() {
 
       {/* Active Tab Panel */}
       <div>
+        {isProprietor && !isAdmin && activeTab !== 'profile' && activeTab !== 'staff' && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-900 text-xs flex items-center gap-2.5">
+            <span className="text-base">👑</span>
+            <div>
+              <span className="font-bold">Proprietor Executive Oversight:</span> Day-to-day operations (calendar terms, streams, and teaching assignments) are executed by the <strong>School Administrator</strong>. As Proprietor, you can review all academic records and appoint, replace, or reassign the Administrator at any time in <strong>Staff & Governance</strong>.
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'students' && (
+          <StudentsSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdmin} />
+        )}
+
         {activeTab === 'profile' && (
-          <ProfileSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+          <ProfileSection schoolId={schoolId} activeRole={activeRole} canEdit={canEditProfile} />
         )}
 
         {activeTab === 'calendar' && (
-          <AcademicCalendarSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+          <AcademicCalendarSection schoolId={schoolId} activeRole={activeRole} canEdit={canEditOperational} />
         )}
 
         {activeTab === 'classes' && (
-          <ClassesStreamsSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+          <ClassesStreamsSection schoolId={schoolId} activeRole={activeRole} canEdit={canEditOperational} />
         )}
 
         {activeTab === 'subjects' && (
-          <SubjectCatalogueSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+          <SubjectCatalogueSection schoolId={schoolId} activeRole={activeRole} canEdit={canEditOperational} />
         )}
 
         {activeTab === 'staff' && (
           <StaffGovernanceSection
             schoolId={schoolId}
             activeRole={activeRole}
-            canEdit={isAdminOrProprietor}
+            canEdit={canEditOperational}
             isProprietor={isProprietor}
           />
         )}
 
         {activeTab === 'teaching' && (
-          <TeachingAssignmentsSection schoolId={schoolId} activeRole={activeRole} canEdit={isAdminOrProprietor} />
+          <TeachingAssignmentsSection schoolId={schoolId} activeRole={activeRole} canEdit={canEditOperational} />
+        )}
+
+        {activeTab === 'finance' && (
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center space-y-3">
+            <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#3B82F6] flex items-center justify-center mx-auto">
+              <Building2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-[#0F172A]">School Finance & Fee Accounts</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Student fee categories, tuition invoicing, and payment reconciliation will be managed in Feature 4. Active student records are linked and ready.
+            </p>
+          </div>
         )}
       </div>
 

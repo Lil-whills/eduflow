@@ -122,23 +122,57 @@ class RegisterView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
-        user = User.objects.create_user(
-            email=data['email'],
-            password=data['password'],
-            first_name=data['first_name'],
-            last_name=data['last_name'],
-            is_active=True,
-            is_platform_operator=False
-        )
+        email = data['email']
+        existing_user = User.objects.filter(email=email).first()
 
-        SecurityAuditEvent.log(
-            action='USER_REGISTERED',
-            actor=user,
-            target_type='User',
-            target_id=user.id,
-            ip_address=request.META.get('REMOTE_ADDR'),
-            metadata={'email': user.email}
-        )
+        if existing_user and not existing_user.is_active:
+            # Invited or pending user establishing credentials via public registration
+            user = existing_user
+            user.set_password(data['password'])
+            user.first_name = data['first_name']
+            user.last_name = data['last_name']
+            user.is_active = True
+            user.token_version += 1
+            user.save()
+
+            from tenants.models import InvitationToken, SchoolMembership
+            InvitationToken.objects.filter(email=email, is_accepted=False).update(is_accepted=True)
+
+            pending_memberships = SchoolMembership.objects.filter(
+                user=user,
+                school__workspace_status='PENDING_ACTIVATION',
+                status='ACTIVE'
+            ).select_related('school')
+            for m in pending_memberships:
+                m.school.workspace_status = 'ONBOARDING'
+                m.school.save(update_fields=['workspace_status'])
+
+            SecurityAuditEvent.log(
+                action='INVITED_USER_REGISTERED_AND_ACTIVATED',
+                actor=user,
+                target_type='User',
+                target_id=user.id,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                metadata={'email': user.email, 'source': 'public_registration'}
+            )
+        else:
+            user = User.objects.create_user(
+                email=email,
+                password=data['password'],
+                first_name=data['first_name'],
+                last_name=data['last_name'],
+                is_active=True,
+                is_platform_operator=False
+            )
+
+            SecurityAuditEvent.log(
+                action='USER_REGISTERED',
+                actor=user,
+                target_type='User',
+                target_id=user.id,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                metadata={'email': user.email}
+            )
 
         tokens = AuthTokenService.create_session_and_tokens(user, request=request)
 

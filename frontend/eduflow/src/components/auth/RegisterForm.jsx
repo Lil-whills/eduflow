@@ -18,9 +18,26 @@ export function RegisterForm({ onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
-    setLoading(true)
 
-    const result = await register(firstName, lastName, email, password, confirmPassword)
+    // Pre-validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address (e.g. name@domain.com).')
+      return
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long.')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please make sure both passwords match.')
+      return
+    }
+
+    setLoading(true)
+    const result = await register(firstName.trim(), lastName.trim(), email.trim(), password, confirmPassword)
     setLoading(false)
 
     if (result.ok) {

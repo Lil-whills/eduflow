@@ -24,6 +24,7 @@ export function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/accept-invite" element={<AcceptInvitationPage />} />
+              <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
               <Route path="/admin" element={<AdminLoginPage />} />
               <Route path="/admin/login" element={<AdminLoginPage />} />
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />

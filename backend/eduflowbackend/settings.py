@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'authentication',
     'tenants',
     'school_config',
+    'students',
 ]
 
 MIDDLEWARE = [
@@ -189,9 +190,15 @@ REFRESH_COOKIE_SECURE = not DEBUG
 REFRESH_COOKIE_SAMESITE = 'Lax'
 
 # CORS & CSRF Configuration
-cors_origins_str = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173')
+from corsheaders.defaults import default_headers
+
+cors_origins_str = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000')
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_str.split(',') if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'x-active-role',
+    'x-refresh-idempotency-key',
+]
 
 csrf_origins_str = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173')
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_str.split(',') if origin.strip()]

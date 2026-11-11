@@ -39,6 +39,9 @@ export function InitialAdminWizard({ onAssignAdmin, loading }) {
             <span>Assign First Administrator</span>
           </button>
         </form>
+        <p className="text-[11px] text-slate-500 italic">
+          If appointing a separate headmaster/admin, they can activate via the email link or by clicking &quot;Create Account&quot; with this email address.
+        </p>
       </div>
     </div>
   )

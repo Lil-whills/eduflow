@@ -7,7 +7,8 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from tenants.models import School, SchoolMembership
+from django.db import transaction
+from tenants.models import School, SchoolMembership, Role, RoleAssignment
 from school_config.models import (
     SchoolProfile,
     AcademicYear,
@@ -142,6 +143,78 @@ class AcademicYearListCreateView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
+class AcademicYearDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+
+        if name:
+            year.name = name.strip()
+        if start_date:
+            year.start_date = start_date
+        if end_date:
+            year.end_date = end_date
+        year.save()
+        return Response({'success': True, 'data': AcademicYearSerializer(year).data, 'error': None})
+
+    def delete(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        year_name = year.name
+        year.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Academic year '{year_name}' deleted successfully."},
+            'error': None
+        })
+
+
+class AcademicTermDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        status_val = request.data.get('status')
+        term_number = request.data.get('term_number')
+
+        if name:
+            term.name = name.strip()
+        if start_date:
+            term.start_date = start_date
+        if end_date:
+            term.end_date = end_date
+        if term_number is not None:
+            term.term_number = int(term_number)
+        if status_val in ['DRAFT', 'ACTIVE', 'COMPLETED']:
+            term.status = status_val
+
+        term.save()
+        return Response({'success': True, 'data': AcademicTermSerializer(term).data, 'error': None})
+
+    def delete(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+        term_name = term.name
+        term.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Term '{term_name}' deleted successfully."},
+            'error': None
+        })
+
+
 class AcademicYearActivateView(APIView):
     permission_classes = [IsSchoolAdminOrProprietor]
 
@@ -166,6 +239,78 @@ class AcademicYearActivateView(APIView):
                 'data': None,
                 'error': {'code': 'VALIDATION_ERROR', 'message': str(e), 'details': e.message_dict if hasattr(e, 'message_dict') else str(e)}
             }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AcademicYearDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+
+        if name:
+            year.name = name.strip()
+        if start_date:
+            year.start_date = start_date
+        if end_date:
+            year.end_date = end_date
+        year.save()
+        return Response({'success': True, 'data': AcademicYearSerializer(year).data, 'error': None})
+
+    def delete(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        year_name = year.name
+        year.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Academic year '{year_name}' deleted successfully."},
+            'error': None
+        })
+
+
+class AcademicTermDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        status_val = request.data.get('status')
+        term_number = request.data.get('term_number')
+
+        if name:
+            term.name = name.strip()
+        if start_date:
+            term.start_date = start_date
+        if end_date:
+            term.end_date = end_date
+        if term_number is not None:
+            term.term_number = int(term_number)
+        if status_val in ['DRAFT', 'ACTIVE', 'COMPLETED']:
+            term.status = status_val
+
+        term.save()
+        return Response({'success': True, 'data': AcademicTermSerializer(term).data, 'error': None})
+
+    def delete(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+        term_name = term.name
+        term.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Term '{term_name}' deleted successfully."},
+            'error': None
+        })
 
 
 class AcademicYearCompleteView(APIView):
@@ -221,6 +366,78 @@ class AcademicTermCreateView(APIView):
                 'data': None,
                 'error': {'code': 'VALIDATION_ERROR', 'message': str(e), 'details': e.message_dict if hasattr(e, 'message_dict') else str(e)}
             }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AcademicYearDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+
+        if name:
+            year.name = name.strip()
+        if start_date:
+            year.start_date = start_date
+        if end_date:
+            year.end_date = end_date
+        year.save()
+        return Response({'success': True, 'data': AcademicYearSerializer(year).data, 'error': None})
+
+    def delete(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        year_name = year.name
+        year.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Academic year '{year_name}' deleted successfully."},
+            'error': None
+        })
+
+
+class AcademicTermDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        status_val = request.data.get('status')
+        term_number = request.data.get('term_number')
+
+        if name:
+            term.name = name.strip()
+        if start_date:
+            term.start_date = start_date
+        if end_date:
+            term.end_date = end_date
+        if term_number is not None:
+            term.term_number = int(term_number)
+        if status_val in ['DRAFT', 'ACTIVE', 'COMPLETED']:
+            term.status = status_val
+
+        term.save()
+        return Response({'success': True, 'data': AcademicTermSerializer(term).data, 'error': None})
+
+    def delete(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+        term_name = term.name
+        term.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Term '{term_name}' deleted successfully."},
+            'error': None
+        })
 
 
 # ----------------------------------------------------------------------
@@ -520,18 +737,23 @@ class ProprietorAdminReassignView(APIView):
 
         try:
             new_admin_email = serializer.validated_data['new_admin_email']
-            membership = StaffGovernanceService.reassign_administrator(
+            membership, raw_token = StaffGovernanceService.reassign_administrator(
                 school=school,
                 new_admin_email=new_admin_email,
                 actor=request.user
             )
+            response_data = {
+                'membership_id': str(membership.id),
+                'email': membership.user.email,
+                'message': f"Administrator role successfully assigned to {membership.user.email}."
+            }
+            if raw_token:
+                response_data['dev_invitation_token'] = raw_token
+                response_data['invitation_url'] = f"/accept-invitation?token={raw_token}"
+
             return Response({
                 'success': True,
-                'data': {
-                    'membership_id': str(membership.id),
-                    'email': membership.user.email,
-                    'message': f"Administrator role successfully assigned to {membership.user.email}."
-                },
+                'data': response_data,
                 'error': None
             })
         except (PermissionDenied, ValidationError) as e:
@@ -607,6 +829,78 @@ class ClassTeacherAssignmentView(APIView):
                 'data': None,
                 'error': {'code': 'VALIDATION_ERROR', 'message': str(e), 'details': e.message_dict if hasattr(e, 'message_dict') else str(e)}
             }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AcademicYearDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+
+        if name:
+            year.name = name.strip()
+        if start_date:
+            year.start_date = start_date
+        if end_date:
+            year.end_date = end_date
+        year.save()
+        return Response({'success': True, 'data': AcademicYearSerializer(year).data, 'error': None})
+
+    def delete(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        year_name = year.name
+        year.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Academic year '{year_name}' deleted successfully."},
+            'error': None
+        })
+
+
+class AcademicTermDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        status_val = request.data.get('status')
+        term_number = request.data.get('term_number')
+
+        if name:
+            term.name = name.strip()
+        if start_date:
+            term.start_date = start_date
+        if end_date:
+            term.end_date = end_date
+        if term_number is not None:
+            term.term_number = int(term_number)
+        if status_val in ['DRAFT', 'ACTIVE', 'COMPLETED']:
+            term.status = status_val
+
+        term.save()
+        return Response({'success': True, 'data': AcademicTermSerializer(term).data, 'error': None})
+
+    def delete(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+        term_name = term.name
+        term.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Term '{term_name}' deleted successfully."},
+            'error': None
+        })
 
 
 class ClassTeacherAssignmentEndView(APIView):
@@ -689,6 +983,78 @@ class SubjectTeacherAssignmentView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
+class AcademicYearDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+
+        if name:
+            year.name = name.strip()
+        if start_date:
+            year.start_date = start_date
+        if end_date:
+            year.end_date = end_date
+        year.save()
+        return Response({'success': True, 'data': AcademicYearSerializer(year).data, 'error': None})
+
+    def delete(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        year_name = year.name
+        year.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Academic year '{year_name}' deleted successfully."},
+            'error': None
+        })
+
+
+class AcademicTermDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        status_val = request.data.get('status')
+        term_number = request.data.get('term_number')
+
+        if name:
+            term.name = name.strip()
+        if start_date:
+            term.start_date = start_date
+        if end_date:
+            term.end_date = end_date
+        if term_number is not None:
+            term.term_number = int(term_number)
+        if status_val in ['DRAFT', 'ACTIVE', 'COMPLETED']:
+            term.status = status_val
+
+        term.save()
+        return Response({'success': True, 'data': AcademicTermSerializer(term).data, 'error': None})
+
+    def delete(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+        term_name = term.name
+        term.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Term '{term_name}' deleted successfully."},
+            'error': None
+        })
+
+
 class SubjectTeacherAssignmentEndView(APIView):
     permission_classes = [IsSchoolAdminOrProprietor]
 
@@ -700,3 +1066,214 @@ class SubjectTeacherAssignmentEndView(APIView):
         assignment.save(update_fields=['status', 'ended_at'])
         return Response({'success': True, 'data': SubjectTeacherAssignmentSerializer(assignment).data, 'error': None})
 
+
+
+class AcademicYearDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+
+        if name:
+            year.name = name.strip()
+        if start_date:
+            year.start_date = start_date
+        if end_date:
+            year.end_date = end_date
+        year.save()
+        return Response({'success': True, 'data': AcademicYearSerializer(year).data, 'error': None})
+
+    def delete(self, request, school_id, year_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        year_name = year.name
+        year.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Academic year '{year_name}' deleted successfully."},
+            'error': None
+        })
+
+
+class AcademicTermDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+
+        name = request.data.get('name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        status_val = request.data.get('status')
+        term_number = request.data.get('term_number')
+
+        if name:
+            term.name = name.strip()
+        if start_date:
+            term.start_date = start_date
+        if end_date:
+            term.end_date = end_date
+        if term_number is not None:
+            term.term_number = int(term_number)
+        if status_val in ['DRAFT', 'ACTIVE', 'COMPLETED']:
+            term.status = status_val
+
+        term.save()
+        return Response({'success': True, 'data': AcademicTermSerializer(term).data, 'error': None})
+
+    def delete(self, request, school_id, year_id, term_id):
+        school = get_school_or_404(school_id)
+        year = get_object_or_404(AcademicYear, id=year_id, school=school)
+        term = get_object_or_404(AcademicTerm, id=term_id, academic_year=year)
+        term_name = term.name
+        term.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Term '{term_name}' deleted successfully."},
+            'error': None
+        })
+
+
+class ClassLevelDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, level_id):
+        school = get_school_or_404(school_id)
+        level = get_object_or_404(ClassLevel, id=level_id, school=school)
+
+        name = request.data.get('name')
+        stage = request.data.get('stage')
+        order_index = request.data.get('order_index')
+
+        if name:
+            level.name = name.strip()
+        if stage:
+            level.stage = stage
+        if order_index is not None:
+            level.order_index = int(order_index)
+        level.save()
+        return Response({'success': True, 'data': ClassLevelSerializer(level).data, 'error': None})
+
+    def delete(self, request, school_id, level_id):
+        school = get_school_or_404(school_id)
+        level = get_object_or_404(ClassLevel, id=level_id, school=school)
+        level_name = level.name
+        level.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Class level '{level_name}' and its streams deleted successfully."},
+            'error': None
+        })
+
+
+class ClassGroupDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, group_id):
+        school = get_school_or_404(school_id)
+        group = get_object_or_404(ClassGroup, id=group_id, school=school)
+
+        if 'stream_name' in request.data:
+            group.stream_name = request.data.get('stream_name', '').strip()
+        if 'capacity' in request.data:
+            cap = request.data.get('capacity')
+            group.capacity = int(cap) if cap else None
+        if 'status' in request.data:
+            group.status = request.data.get('status')
+
+        group.save()
+        return Response({'success': True, 'data': ClassGroupSerializer(group).data, 'error': None})
+
+    def delete(self, request, school_id, group_id):
+        school = get_school_or_404(school_id)
+        group = get_object_or_404(ClassGroup, id=group_id, school=school)
+        group_name = group.display_name
+        group.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Class stream '{group_name}' removed successfully."},
+            'error': None
+        })
+
+
+class SubjectDetailView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def patch(self, request, school_id, subject_id):
+        school = get_school_or_404(school_id)
+        subject = get_object_or_404(Subject, id=subject_id, school=school)
+
+        name = request.data.get('name')
+        code = request.data.get('code')
+        category = request.data.get('category')
+        description = request.data.get('description')
+
+        if name:
+            subject.name = name.strip()
+        if code is not None:
+            subject.code = code.strip()
+        if category:
+            subject.category = category
+        if description is not None:
+            subject.description = description.strip()
+
+        subject.save()
+        return Response({'success': True, 'data': SubjectSerializer(subject).data, 'error': None})
+
+    def delete(self, request, school_id, subject_id):
+        school = get_school_or_404(school_id)
+        subject = get_object_or_404(Subject, id=subject_id, school=school)
+        subject_name = subject.name
+        subject.delete()
+        return Response({
+            'success': True,
+            'data': {'message': f"Subject '{subject_name}' deleted successfully."},
+            'error': None
+        })
+
+
+class SchoolMemberRolesUpdateView(APIView):
+    permission_classes = [IsSchoolAdminOrProprietor]
+
+    def post(self, request, school_id, membership_id):
+        school = get_school_or_404(school_id)
+        membership = get_object_or_404(SchoolMembership, id=membership_id, school=school)
+        roles = request.data.get('roles', [])
+
+        if not isinstance(roles, list):
+            return Response({
+                'success': False,
+                'data': None,
+                'error': {'code': 'VALIDATION_ERROR', 'message': 'Roles must be a list of role names.'}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Base role: SUBJECT_TEACHER is always granted to staff members
+        if Role.SUBJECT_TEACHER not in roles:
+            roles.append(Role.SUBJECT_TEACHER)
+
+        with transaction.atomic():
+            for role_name in [Role.SUBJECT_TEACHER, Role.CLASS_TEACHER, Role.ACCOUNTANT]:
+                role_obj, _ = Role.objects.get_or_create(name=role_name)
+                ra, _ = RoleAssignment.objects.get_or_create(membership=membership, role=role_obj)
+                ra.is_active = (role_name in roles)
+                ra.save()
+
+        active_roles = list(
+            RoleAssignment.objects.filter(membership=membership, is_active=True).values_list('role__name', flat=True)
+        )
+        return Response({
+            'success': True,
+            'data': {
+                'membership_id': str(membership.id),
+                'email': membership.user.email,
+                'assigned_roles': active_roles,
+                'message': f"Roles updated for {membership.user.email}."
+            },
+            'error': None
+        })

@@ -404,25 +404,30 @@ class SchoolOnboardingAssignAdminView(APIView):
         name = serializer.validated_data.get('admin_name', '')
 
         try:
-            school, admin_user = SchoolRoleService.assign_initial_admin(
+            school, admin_user, raw_token = SchoolRoleService.assign_initial_admin(
                 school_id=school_id,
                 proprietor_user=request.user,
                 admin_email=email,
                 admin_name=name,
                 request=request
             )
+            data = {
+                'school_id': str(school.id),
+                'school_name': school.name,
+                'workspace_status': school.workspace_status,
+                'admin_user': {
+                    'id': str(admin_user.id),
+                    'email': admin_user.email
+                },
+                'message': 'Administrator successfully assigned. School workspace is now ACTIVE.'
+            }
+            if raw_token:
+                data['dev_invitation_token'] = raw_token
+                data['invitation_url'] = f"/accept-invitation?token={raw_token}"
+
             return Response({
                 'success': True,
-                'data': {
-                    'school_id': str(school.id),
-                    'school_name': school.name,
-                    'workspace_status': school.workspace_status,
-                    'admin_user': {
-                        'id': str(admin_user.id),
-                        'email': admin_user.email
-                    },
-                    'message': 'Administrator successfully assigned. School workspace is now ACTIVE.'
-                }
+                'data': data
             }, status=status.HTTP_200_OK)
         except Exception as exc:
             return Response({

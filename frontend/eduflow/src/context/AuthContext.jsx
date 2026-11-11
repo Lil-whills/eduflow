@@ -5,7 +5,10 @@ import {
   platformLogin as apiPlatformLogin,
   logout as apiLogout,
   fetchCurrentUser,
-  getAccessToken
+  getAccessToken,
+  refreshAccessToken,
+  clearAccessToken,
+  formatApiError
 } from '../services/api'
 
 const AuthContext = createContext(null)
@@ -28,23 +31,47 @@ export function AuthProvider({ children }) {
     setAuthModalOpen(false)
   }
 
+  const handleSetActiveRole = (role) => {
+    setActiveRole(role)
+    if (typeof window !== 'undefined' && role) {
+      sessionStorage.setItem('eduflow_active_role', role)
+    }
+  }
+
   const loadUserData = async () => {
-    if (getAccessToken()) {
+    let token = getAccessToken()
+    if (!token) {
+      // Restore session on browser refresh via HttpOnly refresh cookie
+      const refreshRes = await refreshAccessToken()
+      if (refreshRes.ok && refreshRes.access) {
+        token = refreshRes.access
+      }
+    }
+
+    if (token) {
       try {
         const res = await fetchCurrentUser()
         if (res.ok && res.data?.success) {
           const user = res.data.data
           setCurrentUser(user)
           const roles = user?.memberships?.assigned_roles || []
-          if (roles.length > 0 && !activeRole) {
+          const savedRole = typeof window !== 'undefined' ? sessionStorage.getItem('eduflow_active_role') : null
+          if (savedRole && roles.includes(savedRole)) {
+            setActiveRole(savedRole)
+          } else if (roles.length > 0) {
             setActiveRole(roles[0])
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('eduflow_active_role', roles[0])
+            }
           }
           return user
         } else {
           setCurrentUser(null)
+          clearAccessToken()
         }
       } catch {
         setCurrentUser(null)
+        clearAccessToken()
       }
     } else {
       setCurrentUser(null)
@@ -65,11 +92,11 @@ export function AuthProvider({ children }) {
       const user = res.data.data.user
       setCurrentUser(user)
       const roles = user?.memberships?.assigned_roles || []
-      if (roles.length > 0) setActiveRole(roles[0])
+      if (roles.length > 0) handleSetActiveRole(roles[0])
       closeAuthModal()
       return { ok: true, user }
     }
-    return { ok: false, error: res.data?.error?.message || 'Login failed.' }
+    return { ok: false, error: formatApiError(res, 'Login failed. Please check your credentials.') }
   }
 
   const register = async (firstName, lastName, email, password, confirmPassword) => {
@@ -77,10 +104,12 @@ export function AuthProvider({ children }) {
     if (res.ok && res.data?.success) {
       const user = res.data.data.user
       setCurrentUser(user)
+      const roles = user?.memberships?.assigned_roles || []
+      if (roles.length > 0) handleSetActiveRole(roles[0])
       closeAuthModal()
       return { ok: true, user }
     }
-    return { ok: false, error: res.data?.error?.message || 'Registration failed.' }
+    return { ok: false, error: formatApiError(res, 'Registration failed. Please check form details.') }
   }
 
   const platformLogin = async (email, password) => {
@@ -92,20 +121,24 @@ export function AuthProvider({ children }) {
     }
     return {
       ok: false,
-      error: res.data?.error?.message || 'Platform authentication failed. Authorized personnel only.'
+      error: formatApiError(res, 'Platform authentication failed. Authorized personnel only.')
     }
   }
 
   const logout = async () => {
     await apiLogout()
+    clearAccessToken()
     setCurrentUser(null)
     setActiveRole(null)
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('eduflow_active_role')
+    }
   }
 
   const value = {
     currentUser,
     activeRole,
-    setActiveRole,
+    setActiveRole: handleSetActiveRole,
     authLoading,
     authModalOpen,
     authModalTab,

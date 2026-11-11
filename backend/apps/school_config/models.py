@@ -37,6 +37,7 @@ class SchoolProfile(TimestampedModel):
     contact_phone = models.CharField(max_length=50, blank=True)
     website = models.URLField(max_length=255, blank=True)
     registration_number = models.CharField(max_length=100, blank=True)
+    default_class_capacity = models.PositiveIntegerField(default=35)
 
     def __str__(self):
         return f"Profile for {self.school.name}"
@@ -192,6 +193,7 @@ class ClassGroup(TimestampedModel):
         related_name='groups'
     )
     stream_name = models.CharField(max_length=20, blank=True)
+    capacity = models.PositiveIntegerField(null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,

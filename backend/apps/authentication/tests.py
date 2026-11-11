@@ -308,6 +308,78 @@ class AuthAPIExtendedTests(TestCase):
 
 
 
+class InvitedUserPublicRegistrationFlowTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.school = School.objects.create(
+            name='Kwame Nkrumah Memorial School',
+            slug='knms-accra',
+            workspace_status='ACTIVE'
+        )
+        self.admin_role, _ = Role.objects.get_or_create(name=Role.ADMINISTRATOR)
+
+    def test_invited_administrator_can_register_and_inherits_role(self):
+        admin_email = 'newadmin@knms.edu.gh'
+        # 1. Proprietor assigns this email (creates inactive user with membership & role)
+        invited_user = User.objects.create_user(
+            email=admin_email,
+            password=None,
+            is_active=False
+        )
+        membership = SchoolMembership.objects.create(
+            school=self.school,
+            user=invited_user,
+            status='ACTIVE'
+        )
+        RoleAssignment.objects.create(
+            membership=membership,
+            role=self.admin_role,
+            is_active=True
+        )
+
+        # 2. Invited admin registers via public registration endpoint
+        reg_payload = {
+            'first_name': 'Kofi',
+            'last_name': 'Mensah',
+            'email': admin_email,
+            'password': 'AdminSecurePassword123!',
+            'confirm_password': 'AdminSecurePassword123!'
+        }
+        res = self.client.post('/api/v1/auth/register/', reg_payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(res.data['success'])
+
+        # Verify tokens returned and session established
+        self.assertIn('access', res.data['data'])
+        self.assertIn('session_id', res.data['data'])
+
+        # Verify user record updated in database
+        invited_user.refresh_from_db()
+        self.assertTrue(invited_user.is_active)
+        self.assertEqual(invited_user.first_name, 'Kofi')
+        self.assertEqual(invited_user.last_name, 'Mensah')
+        self.assertTrue(invited_user.check_password('AdminSecurePassword123!'))
+
+        # Verify user profile includes school and ADMINISTRATOR role
+        user_data = res.data['data']['user']
+        self.assertIsNotNone(user_data['memberships'])
+        self.assertEqual(user_data['memberships']['school_name'], 'Kwame Nkrumah Memorial School')
+        self.assertIn(Role.ADMINISTRATOR, user_data['memberships']['assigned_roles'])
+
+        # 3. Attempting to register again fails with active account message
+        dup_res = self.client.post('/api/v1/auth/register/', reg_payload, format='json')
+        self.assertEqual(dup_res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('already exists', str(dup_res.data))
+
+        # 4. Invited admin can log in with their newly set password
+        login_res = self.client.post('/api/v1/auth/login/', {
+            'email': admin_email,
+            'password': 'AdminSecurePassword123!'
+        }, format='json')
+        self.assertEqual(login_res.status_code, status.HTTP_200_OK)
+        self.assertTrue(login_res.data['success'])
+
+
 class SecurityAuditImmutabilityTests(TestCase):
     def test_audit_records_cannot_be_modified_or_deleted(self):
         user = User.objects.create_user(email='audit_user@school.org', password='pwd')

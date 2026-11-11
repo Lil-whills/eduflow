@@ -121,7 +121,7 @@ class InviteStaffSerializer(serializers.Serializer):
         Role.ACCOUNTANT,
         Role.CLASS_TEACHER,
         Role.SUBJECT_TEACHER
-    ])
+    ], required=False, default=Role.SUBJECT_TEACHER)
 
     def validate_email(self, value):
         return value.strip().lower()

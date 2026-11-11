@@ -12,20 +12,87 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-// In-memory access token storage (Confidentiality: immune to persistent XSS)
-let inMemoryAccessToken = null;
+// Access token storage with persistent reload recovery
+let inMemoryAccessToken = typeof window !== 'undefined' ? sessionStorage.getItem('eduflow_access_token') : null;
 let refreshPromise = null;
 
 export function setAccessToken(token) {
   inMemoryAccessToken = token;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      sessionStorage.setItem('eduflow_access_token', token);
+    } else {
+      sessionStorage.removeItem('eduflow_access_token');
+    }
+  }
 }
 
 export function getAccessToken() {
+  if (!inMemoryAccessToken && typeof window !== 'undefined') {
+    inMemoryAccessToken = sessionStorage.getItem('eduflow_access_token');
+  }
   return inMemoryAccessToken;
 }
 
 export function clearAccessToken() {
   inMemoryAccessToken = null;
+  if (typeof window !== 'undefined') {
+    sessionStorage.removeItem('eduflow_access_token');
+  }
+}
+
+/**
+ * Universal Error Formatter for Eduflow SaaS API Responses.
+ * Unpacks field-level validation errors, network failures, and domain messages
+ * into human-readable, precise error guidance.
+ */
+export function formatApiError(res, defaultMsg = 'An error occurred. Please try again.') {
+  if (!res) return defaultMsg;
+
+  // 1. Network / Server connection failures
+  if (
+    res.status === 0 ||
+    res.data?.error?.code === 'NETWORK_ERROR' ||
+    res.data?.error?.message === 'Failed to fetch' ||
+    res.data?.error?.message?.includes('NetworkError')
+  ) {
+    return 'Unable to communicate with the Eduflow backend server. Please check your network connection or make sure the Django server is running on http://127.0.0.1:8000.';
+  }
+
+  const errObj = res.data?.error;
+
+  // 2. Unpack field-level validation details
+  const details = errObj?.details;
+  if (details && typeof details === 'object') {
+    if (Array.isArray(details)) {
+      return details.join('\n');
+    }
+    const lines = [];
+    for (const [key, val] of Object.entries(details)) {
+      const fieldTitle = key === 'non_field_errors' ? '' : `${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}: `;
+      const messageText = Array.isArray(val) ? val.join(', ') : String(val);
+      lines.push(`• ${fieldTitle}${messageText}`);
+    }
+    if (lines.length > 0) {
+      return lines.join('\n');
+    }
+  }
+
+  // 3. Fallback to API error message
+  if (errObj?.message) {
+    return errObj.message;
+  }
+
+  // 4. Fallback to DRF standard detail
+  if (res.data?.detail) {
+    return res.data.detail;
+  }
+
+  if (typeof res.data === 'string' && res.data.trim()) {
+    return res.data;
+  }
+
+  return defaultMsg;
 }
 
 /**
@@ -564,7 +631,201 @@ export async function endSubjectTeacherAssignment(schoolId, assignmentId, active
   });
 }
 
+// ----------------------------------------------------------------------
+// Academic Calendar & Terms Management (Editable & Deletable)
+// ----------------------------------------------------------------------
+
+export async function updateAcademicYear(schoolId, yearId, yearData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/academic-years/${yearId}/`, {
+    method: 'PATCH',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(yearData),
+  });
+}
+
+export async function deleteAcademicYear(schoolId, yearId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/academic-years/${yearId}/`, {
+    method: 'DELETE',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function updateAcademicTerm(schoolId, yearId, termId, termData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/academic-years/${yearId}/terms/${termId}/`, {
+    method: 'PATCH',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(termData),
+  });
+}
+
+export async function deleteAcademicTerm(schoolId, yearId, termId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/academic-years/${yearId}/terms/${termId}/`, {
+    method: 'DELETE',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+// ----------------------------------------------------------------------
+// Classes & Streams Management (Editable & Removable)
+// ----------------------------------------------------------------------
+
+export async function updateClassLevel(schoolId, levelId, levelData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-levels/${levelId}/`, {
+    method: 'PATCH',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(levelData),
+  });
+}
+
+export async function deleteClassLevel(schoolId, levelId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-levels/${levelId}/`, {
+    method: 'DELETE',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function updateClassGroup(schoolId, groupId, groupData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-groups/${groupId}/`, {
+    method: 'PATCH',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(groupData),
+  });
+}
+
+export async function deleteClassGroup(schoolId, groupId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/class-groups/${groupId}/`, {
+    method: 'DELETE',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+// ----------------------------------------------------------------------
+// Subjects Management (Editable & Deletable)
+// ----------------------------------------------------------------------
+
+export async function updateSubject(schoolId, subjectId, subjectData, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/subjects/${subjectId}/`, {
+    method: 'PATCH',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(subjectData),
+  });
+}
+
+export async function deleteSubject(schoolId, subjectId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/subjects/${subjectId}/`, {
+    method: 'DELETE',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+// ----------------------------------------------------------------------
+// Centralized Staff Roles Management
+// ----------------------------------------------------------------------
+
+export async function updateMemberRoles(schoolId, membershipId, roles, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/staff/${membershipId}/roles/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify({ roles }),
+  });
+}
+
+// ----------------------------------------------------------------------
+// Feature 3: Student Management, Enrollment, and Bulk Data Import
+// ----------------------------------------------------------------------
+
+export async function fetchStudents(schoolId, params = {}, activeRole) {
+  const query = new URLSearchParams(params).toString();
+  const url = query ? `/schools/${schoolId}/students/?${query}` : `/schools/${schoolId}/students/`;
+  return await apiFetch(url, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function fetchStudentDetail(schoolId, studentId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/students/${studentId}/`, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function registerStudent(schoolId, payload, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/students/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateStudent(schoolId, studentId, payload, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/students/${studentId}/`, {
+    method: 'PATCH',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function mergeStudents(schoolId, payload, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/students/merge/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchDuplicateReviews(schoolId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/students/duplicate-reviews/`, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export async function resolveDuplicateReview(schoolId, reviewId, payload, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/students/duplicate-reviews/${reviewId}/resolve/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function withdrawStudentEnrollment(schoolId, enrollmentId, payload, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/enrollments/${enrollmentId}/withdraw/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchClassSummaryReport(schoolId, academicYearId, activeRole) {
+  const q = academicYearId ? `?academic_year_id=${academicYearId}` : '';
+  return await apiFetch(`/schools/${schoolId}/students/reports/class-summary/${q}`, {
+    method: 'GET',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
+export function getStudentImportTemplateUrl(schoolId) {
+  return `/api/v1/schools/${schoolId}/students/import-template/`;
+}
+
+export async function previewStudentImport(schoolId, payload, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/students/import-preview/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function confirmStudentImport(schoolId, batchId, activeRole) {
+  return await apiFetch(`/schools/${schoolId}/students/import-batches/${batchId}/confirm/`, {
+    method: 'POST',
+    headers: activeRole ? { 'X-Active-Role': activeRole } : {},
+  });
+}
+
 export default {
+  formatApiError,
   setAccessToken,
   getAccessToken,
   clearAccessToken,
@@ -621,4 +882,27 @@ export default {
   fetchSubjectTeacherAssignments,
   assignSubjectTeacher,
   endSubjectTeacherAssignment,
+  updateAcademicYear,
+  deleteAcademicYear,
+  updateAcademicTerm,
+  deleteAcademicTerm,
+  updateClassLevel,
+  deleteClassLevel,
+  updateClassGroup,
+  deleteClassGroup,
+  updateSubject,
+  deleteSubject,
+  updateMemberRoles,
+  fetchStudents,
+  fetchStudentDetail,
+  registerStudent,
+  updateStudent,
+  mergeStudents,
+  fetchDuplicateReviews,
+  resolveDuplicateReview,
+  withdrawStudentEnrollment,
+  fetchClassSummaryReport,
+  getStudentImportTemplateUrl,
+  previewStudentImport,
+  confirmStudentImport,
 };

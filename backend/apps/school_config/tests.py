@@ -406,12 +406,14 @@ class SchoolConfigTests(TestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
-        # Previous administrator role deactivated
+        # Previous administrator role deactivated and session invalidated
         old_admin_assignment = RoleAssignment.objects.filter(
             membership=self.admin_membership,
             role=self.admin_role
         ).first()
         self.assertFalse(old_admin_assignment.is_active)
+        self.admin_user.refresh_from_db()
+        self.assertEqual(self.admin_user.token_version, 2)
 
         # New administrator created with ACTIVE administrator role
         new_membership = SchoolMembership.objects.get(
@@ -421,6 +423,20 @@ class SchoolConfigTests(TestCase):
         self.assertTrue(
             RoleAssignment.objects.filter(membership=new_membership, role=self.admin_role, is_active=True).exists()
         )
+        self.assertIn('invitation_url', resp.data['data'])
+
+        # New administrator can register via public registration and inherits active status and role
+        reg_res = self.client.post('/api/v1/auth/register/', {
+            'first_name': 'Ama',
+            'last_name': 'Boateng',
+            'email': 'newheadmaster@accramodern.edu.gh',
+            'password': 'NewHeadmasterPass123!',
+            'confirm_password': 'NewHeadmasterPass123!'
+        }, format='json')
+        self.assertEqual(reg_res.status_code, status.HTTP_201_CREATED)
+        new_membership.user.refresh_from_db()
+        self.assertTrue(new_membership.user.is_active)
+        self.assertEqual(reg_res.data['data']['user']['memberships']['assigned_roles'], ['ADMINISTRATOR'])
 
         # Non-proprietor (e.g. teacher) cannot reassign admin
         teacher_headers = self._auth_headers(self.teacher_user, Role.CLASS_TEACHER)

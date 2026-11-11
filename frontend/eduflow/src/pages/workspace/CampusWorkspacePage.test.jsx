@@ -167,7 +167,7 @@ describe('CampusWorkspacePage Feature 2 Integration', () => {
     expect(screen.getByRole('button', { name: /Academic Calendar/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Classes & Streams/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Subject Catalogue/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Staff Governance/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Staff & Governance/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Teaching Assignments/i })).toBeInTheDocument()
   })
 
@@ -192,7 +192,7 @@ describe('CampusWorkspacePage Feature 2 Integration', () => {
     })
 
     // Switch to Staff Governance
-    fireEvent.click(screen.getByRole('button', { name: /Staff Governance/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Staff & Governance/i }))
     await waitFor(() => {
       expect(screen.getByText(/Staff Governance & Employment Security/i)).toBeInTheDocument()
     })

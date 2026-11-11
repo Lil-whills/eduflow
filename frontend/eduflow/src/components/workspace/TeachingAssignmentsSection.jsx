@@ -10,7 +10,8 @@ import {
   endClassTeacherAssignment,
   fetchSubjectTeacherAssignments,
   assignSubjectTeacher,
-  endSubjectTeacherAssignment
+  endSubjectTeacherAssignment,
+  formatApiError
 } from '../../services/api'
 import { Alert } from '../common/Alert'
 
@@ -123,7 +124,7 @@ export function TeachingAssignmentsSection({ schoolId, activeRole, canEdit }) {
     } else {
       setNotice({
         type: 'error',
-        message: res.data?.error?.message || 'Failed to assign class teacher. Verify teacher role.'
+        message: formatApiError(res, 'Failed to assign class teacher. Verify teacher role.')
       })
     }
   }
@@ -138,7 +139,7 @@ export function TeachingAssignmentsSection({ schoolId, activeRole, canEdit }) {
     } else {
       setNotice({
         type: 'error',
-        message: res.data?.error?.message || 'Failed to assign subject teacher. Verify subject availability.'
+        message: formatApiError(res, 'Failed to assign subject teacher. Verify subject availability.')
       })
     }
   }
@@ -169,9 +170,9 @@ export function TeachingAssignmentsSection({ schoolId, activeRole, canEdit }) {
     }
   }
 
-  // Filter staff by role for selection
-  const eligibleClassTeachers = staff.filter(m => m.status === 'ACTIVE' && m.roles?.includes('CLASS_TEACHER'))
-  const eligibleSubjectTeachers = staff.filter(m => m.status === 'ACTIVE' && m.roles?.includes('SUBJECT_TEACHER'))
+  // All active school staff members are eligible for teaching assignments
+  const eligibleClassTeachers = staff.filter(m => m.status === 'ACTIVE')
+  const eligibleSubjectTeachers = staff.filter(m => m.status === 'ACTIVE')
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
@@ -405,7 +406,7 @@ export function TeachingAssignmentsSection({ schoolId, activeRole, canEdit }) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Teacher (Must have Class Teacher role)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Class Teacher</label>
                 <select
                   value={classTeacherForm.teacher_membership_id}
                   onChange={(e) => setClassTeacherForm({ ...classTeacherForm, teacher_membership_id: e.target.value })}
@@ -415,13 +416,13 @@ export function TeachingAssignmentsSection({ schoolId, activeRole, canEdit }) {
                   <option value="">Select teacher...</option>
                   {eligibleClassTeachers.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.full_name} ({t.email})
+                      {t.full_name || t.email} ({t.email})
                     </option>
                   ))}
                 </select>
                 {eligibleClassTeachers.length === 0 && (
                   <p className="text-[11px] text-amber-600 mt-1">
-                    No active staff have the Class Teacher role assigned. Invite or assign role first.
+                    No active staff members found in the school roster. Invite staff first.
                   </p>
                 )}
               </div>
@@ -499,7 +500,7 @@ export function TeachingAssignmentsSection({ schoolId, activeRole, canEdit }) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Teacher (Must have Subject Teacher role)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Subject Teacher</label>
                 <select
                   value={subjectTeacherForm.teacher_membership_id}
                   onChange={(e) => setSubjectTeacherForm({ ...subjectTeacherForm, teacher_membership_id: e.target.value })}
@@ -509,10 +510,15 @@ export function TeachingAssignmentsSection({ schoolId, activeRole, canEdit }) {
                   <option value="">Select teacher...</option>
                   {eligibleSubjectTeachers.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.full_name} ({t.email})
+                      {t.full_name || t.email} ({t.email})
                     </option>
                   ))}
                 </select>
+                {eligibleSubjectTeachers.length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1">
+                    No active staff members found in the school roster. Invite staff first.
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

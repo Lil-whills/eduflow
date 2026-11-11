@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Building2, Save, MapPin, Mail, Phone, Globe, Award, Edit3, CheckCircle2 } from 'lucide-react'
-import { fetchSchoolProfile, updateSchoolProfile } from '../../services/api'
+import { fetchSchoolProfile, updateSchoolProfile, formatApiError } from '../../services/api'
 import { Alert } from '../common/Alert'
 
 export function ProfileSection({ schoolId, activeRole, canEdit }) {
@@ -23,6 +23,7 @@ export function ProfileSection({ schoolId, activeRole, canEdit }) {
     contact_phone: '',
     website: '',
     registration_number: '',
+    default_class_capacity: 35,
   })
 
   const loadProfile = async () => {
@@ -45,6 +46,7 @@ export function ProfileSection({ schoolId, activeRole, canEdit }) {
         contact_phone: p.contact_phone || '',
         website: p.website || '',
         registration_number: p.registration_number || '',
+        default_class_capacity: p.default_class_capacity || 35,
       })
     }
     setLoading(false)
@@ -67,7 +69,7 @@ export function ProfileSection({ schoolId, activeRole, canEdit }) {
     } else {
       setNotice({
         type: 'error',
-        message: res.data?.error?.message || 'Failed to update profile.',
+        message: formatApiError(res, 'Failed to update school profile.'),
       })
     }
   }
@@ -147,6 +149,20 @@ export function ProfileSection({ schoolId, activeRole, canEdit }) {
                 <option value="JHS_ONLY">Junior High School Only (JHS 1 - 3)</option>
                 <option value="KINDERGARTEN">Kindergarten / Nursery Only</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Configured Class Capacity (Max Students / Stream)</label>
+              <input
+                type="number"
+                min="10"
+                max="100"
+                value={formData.default_class_capacity}
+                onChange={(e) => setFormData({ ...formData, default_class_capacity: parseInt(e.target.value) || 35 })}
+                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#3B82F6] outline-none"
+                placeholder="e.g. 35"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Default target class size for all streams across levels.</p>
             </div>
 
             <div>
@@ -293,6 +309,14 @@ export function ProfileSection({ schoolId, activeRole, canEdit }) {
               <p className="text-xs font-mono text-slate-800 flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5 text-amber-500" />
                 {profile?.registration_number || 'Pending GES verification'}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Class Size Capacity</span>
+              <p className="text-xs font-bold text-blue-600 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                {profile?.default_class_capacity || 35} Students / Stream
               </p>
             </div>
 

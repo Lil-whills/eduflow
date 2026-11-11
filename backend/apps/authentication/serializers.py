@@ -36,8 +36,9 @@ class RegisterSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         email = value.strip().lower()
-        if User.objects.filter(email=email).exists():
-            raise serializers.ValidationError("An account with this email address already exists.")
+        existing_user = User.objects.filter(email=email).first()
+        if existing_user and existing_user.is_active:
+            raise serializers.ValidationError("An active account with this email address already exists. Please sign in.")
         return email
 
     def validate(self, attrs):

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { BookOpen, Plus, Tag, Check, CheckCircle, ShieldAlert } from 'lucide-react'
+import { BookOpen, Plus, Tag, Check, CheckCircle, ShieldAlert, Edit2, Trash2 } from 'lucide-react'
 import {
   fetchSubjects,
   createSubject,
+  updateSubject,
+  deleteSubject,
   fetchClassLevels,
   fetchClassSubjects,
   createClassSubject,
-  deleteClassSubject
+  deleteClassSubject,
+  formatApiError
 } from '../../services/api'
 import { Alert } from '../common/Alert'
 
@@ -22,7 +25,9 @@ export function SubjectCatalogueSection({ schoolId, activeRole, canEdit }) {
 
   // Modals
   const [createSubjectOpen, setCreateSubjectOpen] = useState(false)
+  const [editSubjectOpen, setEditSubjectOpen] = useState(false)
   const [mapSubjectOpen, setMapSubjectOpen] = useState(false)
+  const [selectedSubject, setSelectedSubject] = useState(null)
 
   const [subjectForm, setSubjectForm] = useState({
     name: '',
@@ -88,35 +93,79 @@ export function SubjectCatalogueSection({ schoolId, activeRole, canEdit }) {
     } else {
       setNotice({
         type: 'error',
-        message: res.data?.error?.message || 'Failed to create subject.'
+        message: formatApiError(res, 'Failed to create subject.')
       })
     }
+  }
+
+  const handleEditSubject = async (e) => {
+    e.preventDefault()
+    if (!selectedSubject) return
+    const res = await updateSubject(schoolId, selectedSubject.id, subjectForm, activeRole)
+    if (res.ok && res.data?.success) {
+      setNotice({ type: 'success', message: `Subject '${subjectForm.name}' updated.` })
+      setEditSubjectOpen(false)
+      setSelectedSubject(null)
+      loadData()
+    } else {
+      setNotice({
+        type: 'error',
+        message: formatApiError(res, 'Failed to update subject.')
+      })
+    }
+  }
+
+  const handleDeleteSubject = async (subjectId, subjectName) => {
+    if (!window.confirm(`Delete subject '${subjectName}' from the school catalogue?`)) {
+      return
+    }
+    const res = await deleteSubject(schoolId, subjectId, activeRole)
+    if (res.ok && res.data?.success) {
+      setNotice({ type: 'success', message: `Subject '${subjectName}' deleted.` })
+      loadData()
+    } else {
+      setNotice({
+        type: 'error',
+        message: formatApiError(res, 'Failed to delete subject.')
+      })
+    }
+  }
+
+  const openEditSubjectModal = (subj) => {
+    setSelectedSubject(subj)
+    setSubjectForm({
+      name: subj.name,
+      code: subj.code || '',
+      category: subj.category || 'CORE',
+      description: subj.description || ''
+    })
+    setEditSubjectOpen(true)
   }
 
   const handleMapSubject = async (e) => {
     e.preventDefault()
     const res = await createClassSubject(schoolId, mappingForm, activeRole)
     if (res.ok && res.data?.success) {
-      setNotice({ type: 'success', message: 'Subject mapped to class level successfully.' })
+      setNotice({ type: 'success', message: `Subject allocation saved.` })
       setMapSubjectOpen(false)
       loadClassSubjects(selectedLevelFilter)
     } else {
       setNotice({
         type: 'error',
-        message: res.data?.error?.message || 'Failed to map subject.'
+        message: formatApiError(res, 'Failed to map subject.')
       })
     }
   }
 
-  const handleRemoveMapping = async (mappingId) => {
+  const handleUnmapSubject = async (mappingId) => {
     const res = await deleteClassSubject(schoolId, mappingId, activeRole)
     if (res.ok && res.data?.success) {
-      setNotice({ type: 'success', message: 'Subject unmapped from class.' })
+      setNotice({ type: 'success', message: 'Subject allocation removed.' })
       loadClassSubjects(selectedLevelFilter)
     } else {
       setNotice({
         type: 'error',
-        message: res.data?.error?.message || 'Failed to remove mapping.'
+        message: formatApiError(res, 'Failed to remove subject allocation.')
       })
     }
   }
@@ -127,10 +176,10 @@ export function SubjectCatalogueSection({ schoolId, activeRole, canEdit }) {
         <div>
           <h2 className="text-lg font-black text-[#0F172A] flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-[#3B82F6]" />
-            Subject Catalogue & Curricular Mappings
+            Subject Catalogue & Curriculum Delivery
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage institutional subjects and define which subjects are available/compulsory per grade level.
+            Ghana National Curriculum standards, core & elective subjects, and grade-level allocations.
           </p>
         </div>
 
@@ -140,11 +189,14 @@ export function SubjectCatalogueSection({ schoolId, activeRole, canEdit }) {
               onClick={() => setMapSubjectOpen(true)}
               className="px-3.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
             >
-              <Plus className="w-3.5 h-3.5 text-slate-500" />
-              <span>Map to Class</span>
+              <Tag className="w-3.5 h-3.5 text-slate-500" />
+              <span>Allocate to Class Level</span>
             </button>
             <button
-              onClick={() => setCreateSubjectOpen(true)}
+              onClick={() => {
+                setSubjectForm({ name: '', code: '', category: 'CORE', description: '' })
+                setCreateSubjectOpen(true)
+              }}
               className="px-3.5 py-1.5 rounded-lg bg-[#3B82F6] hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -167,31 +219,53 @@ export function SubjectCatalogueSection({ schoolId, activeRole, canEdit }) {
           {/* Section 1: Subject Catalogue */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Standard GES Subjects ({subjects.length})
+              Standard GES & School Subjects ({subjects.length})
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {subjects.map((subj) => (
                 <div
                   key={subj.id}
-                  className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all shadow-2xs space-y-1.5"
+                  className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all shadow-2xs space-y-2"
                 >
                   <div className="flex items-start justify-between">
-                    <span className="text-xs font-bold text-[#0F172A]">{subj.name}</span>
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                        subj.category === 'CORE'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-purple-100 text-purple-800'
-                      }`}
-                    >
-                      {subj.category}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono">
-                    <span>Code: {subj.code || 'N/A'}</span>
+                    <div>
+                      <span className="text-xs font-bold text-[#0F172A] block">{subj.name}</span>
+                      <span className="text-[11px] text-slate-400 font-mono">Code: {subj.code || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          subj.category === 'CORE'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-purple-100 text-purple-800'
+                        }`}
+                      >
+                        {subj.category}
+                      </span>
+                      {canEdit && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEditSubjectModal(subj)}
+                            title="Edit Subject"
+                            className="text-slate-400 hover:text-blue-600 p-0.5 transition-colors"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSubject(subj.id, subj.name)}
+                            title="Delete Subject"
+                            className="text-slate-400 hover:text-rose-600 p-0.5 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {subj.description && (
-                    <p className="text-[11px] text-slate-500 line-clamp-1">{subj.description}</p>
+                    <p className="text-[11px] text-slate-500 line-clamp-2">{subj.description}</p>
                   )}
                 </div>
               ))}
@@ -248,42 +322,35 @@ export function SubjectCatalogueSection({ schoolId, activeRole, canEdit }) {
                   ) : (
                     classSubjects.map((mapping) => (
                       <tr key={mapping.id} className="hover:bg-slate-50/50">
-                        <td className="p-3 font-bold text-slate-800">{mapping.class_level_name}</td>
-                        <td className="p-3 text-slate-900 font-medium">
-                          {mapping.subject_name}
-                          {mapping.subject_code && (
-                            <span className="ml-1 text-[10px] text-slate-400 font-mono">
-                              ({mapping.subject_code})
-                            </span>
-                          )}
-                        </td>
+                        <td className="p-3 font-semibold text-slate-800">{mapping.class_level_name}</td>
+                        <td className="p-3 font-bold text-slate-900">{mapping.subject_name}</td>
                         <td className="p-3">
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              mapping.subject_category === 'CORE'
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'bg-purple-50 text-purple-700'
+                              mapping.category === 'CORE'
+                                ? 'bg-blue-50 text-blue-800'
+                                : 'bg-purple-50 text-purple-800'
                             }`}
                           >
-                            {mapping.subject_category}
+                            {mapping.category}
                           </span>
                         </td>
                         <td className="p-3">
                           {mapping.is_compulsory ? (
-                            <span className="text-emerald-700 font-bold flex items-center gap-1">
-                              <Check className="w-3.5 h-3.5" /> Compulsory
+                            <span className="text-emerald-700 font-bold flex items-center gap-1 text-[11px]">
+                              <Check className="w-3 h-3 text-emerald-600" /> Yes
                             </span>
                           ) : (
-                            <span className="text-slate-500 font-medium">Elective</span>
+                            <span className="text-slate-400 text-[11px]">Optional Elective</span>
                           )}
                         </td>
                         {canEdit && (
                           <td className="p-3 text-right">
                             <button
-                              onClick={() => handleRemoveMapping(mapping.id)}
-                              className="text-rose-600 hover:text-rose-800 font-bold text-[11px]"
+                              onClick={() => handleUnmapSubject(mapping.id)}
+                              className="text-rose-600 hover:text-rose-800 font-bold text-xs"
                             >
-                              Unmap
+                              Remove
                             </button>
                           </td>
                         )}
@@ -369,6 +436,76 @@ export function SubjectCatalogueSection({ schoolId, activeRole, canEdit }) {
         </div>
       )}
 
+      {/* Edit Subject Modal */}
+      {editSubjectOpen && selectedSubject && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <h3 className="text-base font-bold text-[#0F172A]">Edit Subject</h3>
+            <form onSubmit={handleEditSubject} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Subject Name</label>
+                <input
+                  type="text"
+                  value={subjectForm.name}
+                  onChange={(e) => setSubjectForm({ ...subjectForm, name: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Code</label>
+                  <input
+                    type="text"
+                    value={subjectForm.code}
+                    onChange={(e) => setSubjectForm({ ...subjectForm, code: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#3B82F6] font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Category</label>
+                  <select
+                    value={subjectForm.category}
+                    onChange={(e) => setSubjectForm({ ...subjectForm, category: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg outline-none bg-white"
+                  >
+                    <option value="CORE">Core</option>
+                    <option value="ELECTIVE">Elective</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Description</label>
+                <textarea
+                  value={subjectForm.description}
+                  onChange={(e) => setSubjectForm({ ...subjectForm, description: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditSubjectOpen(false)}
+                  className="px-3 py-1.5 text-xs text-slate-600 font-bold hover:bg-slate-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-xs bg-[#3B82F6] hover:bg-blue-600 text-white font-bold rounded-lg shadow-xs"
+                >
+                  Update Subject
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Map Subject Modal */}
       {mapSubjectOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -443,4 +580,3 @@ export function SubjectCatalogueSection({ schoolId, activeRole, canEdit }) {
     </div>
   )
 }
-
